@@ -1,3 +1,5 @@
+<p align="center"><img src="logo.svg" alt="Wiki Wake logo" width="160"></p>
+
 # Wiki Wake
 
 An Android alarm that wakes you with a spoken Wikipedia article. It supports a daily local-time schedule, random articles or comma-separated topic searches, phone-language default (or a Wikipedia language code such as `es`), a configurable reading-time limit (unlimited by default), and a history that prevents repeats. Use the three-dot menu to configure language, topics, and reading time; enable or disable the alarm with the home-screen switch.
