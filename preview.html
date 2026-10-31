@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ff">
+  <title>Wiki Wake · Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #25224f;
+      background: #e9e8f1;
+    }
+    * { box-sizing: border-box; }
+    body { display: grid; min-height: 100vh; margin: 0; place-items: center; padding: 28px 16px; }
+    .device {
+      width: min(390px, 100%);
+      min-height: 790px;
+      overflow: hidden;
+      border: 8px solid #222130;
+      border-radius: 40px;
+      background: #f5f4ff;
+      box-shadow: 0 24px 80px rgb(34 33 48 / 25%);
+    }
+    .statusbar { display: flex; justify-content: space-between; padding: 12px 24px 4px; font-size: 12px; font-weight: 700; }
+    main { padding: 22px 24px 32px; }
+    .header { display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 10px; color: #5147c8; font-size: 12px; font-weight: 800; letter-spacing: .14em; }
+    .icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 12px; background: #5147c8; color: white; font-size: 18px; letter-spacing: 0; }
+    .more { width: 42px; min-height: 42px; margin: 0; border-radius: 50%; background: #e9e7f6; color: #40389e; font-size: 22px; }
+    h1 { margin: 24px 0 8px; font-size: 32px; letter-spacing: -.045em; }
+    .intro { margin: 0; color: #625f7b; font-size: 15px; line-height: 1.55; }
+    .label { margin: 27px 0 9px; color: #5147c8; font-size: 11px; font-weight: 800; letter-spacing: .12em; }
+    .field { width: 100%; min-height: 52px; padding: 13px 15px; border: 1px solid #dedbed; border-radius: 14px; background: #fff; color: #25224f; font: inherit; }
+    input[type="time"].field { font-size: 22px; font-weight: 700; }
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; font-weight: 700; }
+    .toggle { position: relative; width: 54px; height: 32px; appearance: none; border-radius: 999px; background: #d7d4e5; cursor: pointer; transition: background .2s; }
+    .toggle::before { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: white; box-shadow: 0 1px 3px #0003; content: ""; transition: transform .2s; }
+    .toggle:checked { background: #5147c8; }
+    .toggle:checked::before { transform: translateX(22px); }
+    .settings-summary { margin: 10px 0 0; color: #77738d; font-size: 12px; line-height: 1.5; }
+    textarea.field { min-height: 78px; resize: vertical; }
+    .next { margin-top: 21px; padding: 14px; border: 1px solid #e3e0f2; border-radius: 14px; background: #eeedfa; color: #5147c8; font-size: 13px; font-weight: 650; }
+    button { width: 100%; min-height: 50px; margin-top: 10px; border: 0; border-radius: 15px; font: inherit; font-weight: 700; cursor: pointer; }
+    .primary { margin-top: 19px; background: #5147c8; color: #fff; box-shadow: 0 8px 18px rgb(81 71 200 / 22%); }
+    .secondary { background: #e9e7f6; color: #40389e; }
+    .note { margin: 13px 4px 0; color: #88849b; font-size: 11px; text-align: center; }
+    .settings-backdrop { position: absolute; inset: 0; display: grid; align-items: end; padding: 16px; background: rgb(26 24 48 / 40%); }
+    .settings-backdrop[hidden] { display: none; }
+    .settings { padding: 22px 18px; border-radius: 24px; background: #fff; box-shadow: 0 10px 35px #2222; }
+    .settings h2 { margin: 0 0 4px; font-size: 21px; }
+    .settings .label { margin-top: 17px; }
+    .settings .field { min-height: 46px; }
+    .settings select { appearance: auto; }
+    .settings .hint { margin: 8px 0 0; color: #77738d; font-size: 12px; }
+    .device { position: relative; }
+    .toast { position: absolute; z-index: 2; right: 18px; bottom: 20px; left: 18px; width: auto; min-height: 0; margin: 0; padding: 14px 18px; border-radius: 999px; background: #292738; color: #fff; font-size: 14px; font-weight: 500; text-align: center; box-shadow: 0 5px 16px #0003; opacity: 0; pointer-events: none; transform: translateY(10px); transition: opacity .18s, transform .18s; }
+    .toast.visible { opacity: 1; transform: translateY(0); }
+    @media (max-height: 850px) { .device { min-height: 0; } h1 { margin-top: 16px; } .label { margin-top: 20px; } }
+  </style>
+</head>
+<body>
+  <section class="device" aria-label="Wiki Wake phone app preview">
+    <div class="statusbar"><span>9:41</span><span>◉ ◉ ▰</span></div>
+    <main>
+      <div class="header">
+        <div class="brand"><span class="icon" aria-hidden="true">◷</span> WIKI WAKE</div>
+        <button class="more" type="button" id="open-settings" aria-label="Open settings" aria-haspopup="dialog">⋮</button>
+      </div>
+      <h1>Wake up curious.</h1>
+      <p class="intro">A Wikipedia article, read aloud as your daily alarm.</p>
+
+      <div class="label">ALARM TIME</div>
+      <input class="field" type="time" id="alarm-time" value="07:00" aria-label="Daily alarm time">
+      <label class="toggle-row" for="alarm-toggle">
+        <span>Daily alarm</span>
+        <input class="toggle" type="checkbox" id="alarm-toggle" role="switch" aria-label="Daily alarm">
+      </label>
+      <p class="settings-summary" id="settings-summary">Phone language · Random articles · No length limit</p>
+
+      <div class="next" id="alarm-status">◷ &nbsp; Alarm off</div>
+      <button class="secondary" type="button" id="read-now">Read an article now</button>
+      <p class="note" id="message">Preview only — buttons don’t schedule real alarms.</p>
+    </main>
+    <div class="settings-backdrop" id="settings-dialog" hidden>
+      <section class="settings" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <h2 id="settings-title">Article settings</h2>
+        <div class="label">ARTICLE LANGUAGE</div>
+        <input class="field" id="language" aria-label="Article language" placeholder="Phone language · e.g. es">
+        <div class="label">TOPICS (OPTIONAL)</div>
+        <textarea class="field" id="topics" aria-label="Topics" placeholder="astronomy, ancient history"></textarea>
+        <div class="label">MAXIMUM READING TIME</div>
+        <select class="field" id="length" aria-label="Maximum reading time">
+          <option value="0">No limit</option>
+          <option value="2">2 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <p class="hint">No limit is the default. Stop the article any time.</p>
+        <button class="primary" type="button" id="save-settings">Save settings</button>
+        <button class="secondary" type="button" id="close-settings">Cancel</button>
+      </section>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </section>
+  <script>
+    const timeInput = document.getElementById("alarm-time");
+    const status = document.getElementById("alarm-status");
+    const message = document.getElementById("message");
+    const alarmToggle = document.getElementById("alarm-toggle");
+    const settingsDialog = document.getElementById("settings-dialog");
+    const settingsSummary = document.getElementById("settings-summary");
+    const languageInput = document.getElementById("language");
+    const topicsInput = document.getElementById("topics");
+    const lengthInput = document.getElementById("length");
+    const toast = document.getElementById("toast");
+    let toastTimer;
+    const language = navigator.language.split("-")[0];
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.add("visible");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove("visible"), 2600);
+    }
+
+    function updateSummary() {
+      const currentLanguage = languageInput.value.trim() || `Phone language (${language})`;
+      const topics = topicsInput.value.trim() || "Random articles";
+      const length = lengthInput.value === "0" ? "No limit" : `Up to ${lengthInput.value} min`;
+      settingsSummary.textContent = `${currentLanguage} · ${topics} · ${length}`;
+    }
+
+    document.getElementById("open-settings").addEventListener("click", () => {
+      settingsDialog.hidden = false;
+      languageInput.focus();
+    });
+    document.getElementById("close-settings").addEventListener("click", () => {
+      settingsDialog.hidden = true;
+    });
+    document.getElementById("save-settings").addEventListener("click", () => {
+      settingsDialog.hidden = true;
+      updateSummary();
+      message.textContent = "Settings saved for this preview.";
+    });
+    alarmToggle.addEventListener("change", () => {
+      if (alarmToggle.checked) {
+        status.textContent = `◷  Alarm on · Every day at ${timeInput.value}`;
+        message.textContent = "Preview only — Android permissions are needed for a real alarm.";
+        showToast(`Alarm set for ${timeInput.value}`);
+      } else {
+        status.textContent = "◷  Alarm off";
+        message.textContent = "Preview only — buttons don’t schedule real alarms.";
+        showToast("Alarm turned off");
+      }
+    });
+    timeInput.addEventListener("change", () => {
+      if (alarmToggle.checked) {
+        status.textContent = `◷  Alarm on · Every day at ${timeInput.value}`;
+        showToast(`Alarm set for ${timeInput.value}`);
+      }
+    });
+    document.getElementById("read-now").addEventListener("click", () => {
+      message.textContent = "Preview only — the Android app fetches and reads the article aloud.";
+    });
+    updateSummary();
+  </script>
+</body>
+</html>
