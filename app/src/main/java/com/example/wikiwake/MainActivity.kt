@@ -435,6 +435,10 @@ class MainActivity : Activity() {
                 showSettings()
                 true
             }
+            menu.add("Suggest a feature").setOnMenuItemClickListener {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/andresgur/wikiwake/issues")))
+                true
+            }
             show()
         }
     }
