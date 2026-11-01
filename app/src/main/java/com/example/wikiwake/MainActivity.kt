@@ -467,7 +467,9 @@ class MainActivity : Activity() {
         }
         content.addView(languageSpinner, matchWidth())
 
-        content.addView(label("TOPICS (OPTIONAL)", 12f, 0xFF0F766E.toInt(), top = 14))
+        content.addView(label("ARTICLE SELECTION", 12f, 0xFF0F766E.toInt(), top = 14))
+        content.addView(label("Choose what kind of article you get.", 13f, 0xFF5E7370.toInt(), top = 4))
+        content.addView(label("Topics (optional)", 14f, 0xFF12312E.toInt(), top = 10))
         val topicsInput = editField(
             hint = "Comma-separated · e.g. astronomy, history",
             value = preferences.getString(TOPICS, "").orEmpty()
@@ -477,7 +479,7 @@ class MainActivity : Activity() {
         }
         content.addView(topicsInput, matchWidth())
 
-        content.addView(label("RANDOMNESS", 12f, 0xFF0F766E.toInt(), top = 14))
+        content.addView(label("Randomness", 14f, 0xFF12312E.toInt(), top = 16))
         val randomnessHint = label("", 13f, 0xFF5E7370.toInt(), top = 4)
         val randomnessBar = android.widget.SeekBar(this).apply {
             max = 100
@@ -499,7 +501,7 @@ class MainActivity : Activity() {
         content.addView(randomnessBar, matchWidth(top = 6))
         content.addView(randomnessHint)
 
-        content.addView(label("POPULARITY", 12f, 0xFF0F766E.toInt(), top = 14))
+        content.addView(label("Popularity", 14f, 0xFF12312E.toInt(), top = 16))
         val popularityHint = label("", 13f, 0xFF5E7370.toInt(), top = 4)
         val popularityBar = android.widget.SeekBar(this).apply {
             max = 100
