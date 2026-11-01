@@ -549,7 +549,7 @@ class MainActivity : Activity() {
         val offlineHint = label("", 13f, 0xFF5E7370.toInt(), top = 4)
         fun describeOffline() {
             offlineHint.text = "Downloads a few articles in advance (over Wi-Fi) so your alarm works without internet. Uses ~1 MB." +
-                if (offlineSwitch.isChecked) "\nArticles ready: ${OfflineMode.readyCount(this, preferences)} of ${OfflineMode.POOL_SIZE}" else ""
+                if (offlineSwitch.isChecked) "\nArticles ready: ${OfflineMode.readyCount(this, preferences)}/${OfflineMode.POOL_SIZE}" else ""
         }
         describeOffline()
         content.addView(offlineHint)
