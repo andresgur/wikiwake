@@ -156,10 +156,13 @@ class AlarmPlaybackService : Service() {
                 }
                 VoiceSettings.apply(engine, preferences, Locale.forLanguageTag(languageCode).language)
 
-                spokenText = limitReadingTime(
+                val body = limitReadingTime(
                     SpeechText.clean(article.title, article.extract),
                     preferences.getInt(MainActivity.MAX_MINUTES, 0)
                 )
+                spokenText = if (fromAlarm) {
+                    SpeechText.intro(Locale.forLanguageTag(languageCode).language) + "\n\n" + body
+                } else body
                 speechChunks = splitForSpeech(spokenText, TextToSpeech.getMaxSpeechInputLength())
                 ReadingSession.begin(article.title, article.url, spokenText, currentImage)
                 preferences.edit()

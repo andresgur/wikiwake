@@ -19,6 +19,42 @@ object SpeechText {
         "ссылки", "примечания", "литература", "см. также"
     )
 
+    private val intros = mapOf(
+        "en" to "Good morning. Your article for today is:",
+        "es" to "Buenos días. Tu artículo de hoy es:",
+        "fr" to "Bonjour. Votre article du jour est :",
+        "de" to "Guten Morgen. Dein Artikel für heute ist:",
+        "it" to "Buongiorno. Il tuo articolo di oggi è:",
+        "pt" to "Bom dia. O seu artigo de hoje é:",
+        "nl" to "Goedemorgen. Je artikel voor vandaag is:",
+        "sv" to "God morgon. Din artikel för idag är:",
+        "no" to "God morgen. Din artikkel for i dag er:",
+        "da" to "God morgen. Din artikel for i dag er:",
+        "fi" to "Hyvää huomenta. Päivän artikkelisi on:",
+        "pl" to "Dzień dobry. Twój dzisiejszy artykuł to:",
+        "cs" to "Dobré ráno. Váš dnešní článek je:",
+        "hu" to "Jó reggelt. A mai cikked:",
+        "ro" to "Bună dimineața. Articolul tău de azi este:",
+        "el" to "Καλημέρα. Το άρθρο σου για σήμερα είναι:",
+        "tr" to "Günaydın. Bugünkü makaleniz:",
+        "ru" to "Доброе утро. Ваша статья на сегодня:",
+        "uk" to "Доброго ранку. Ваша стаття на сьогодні:",
+        "ar" to "صباح الخير. مقالتك لهذا اليوم هي:",
+        "he" to "בוקר טוב. הכתבה שלך להיום היא:",
+        "fa" to "صبح بخیر. مقاله امروز شما:",
+        "hi" to "सुप्रभात। आज का आपका लेख है:",
+        "bn" to "শুভ সকাল। আজকের আপনার নিবন্ধ:",
+        "id" to "Selamat pagi. Artikel Anda hari ini adalah:",
+        "vi" to "Chào buổi sáng. Bài viết hôm nay của bạn là:",
+        "th" to "อรุณสวัสดิ์ บทความของคุณวันนี้คือ",
+        "ja" to "おはようございます。今日の記事は、",
+        "ko" to "좋은 아침입니다. 오늘의 문서는",
+        "zh" to "早上好。你今天的文章是：",
+        "ca" to "Bon dia. El teu article d'avui és:"
+    )
+
+    fun intro(language: String): String = intros[language] ?: intros.getValue("en")
+
     fun clean(title: String, raw: String): String {
         val out = StringBuilder()
         out.append(title).append(".\n\n")
