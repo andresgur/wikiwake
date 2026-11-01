@@ -2,6 +2,7 @@ package com.example.wikiwake
 
 import android.app.Service
 import android.content.Intent
+import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -25,6 +26,11 @@ class AlarmPlaybackService : Service() {
     private var speechChunkIndex = 0
     private var fromAlarm = false
     private var fallbackPlayer: MediaPlayer? = null
+    private var currentArticle: WikipediaArticle? = null
+    private var currentImage: Bitmap? = null
+    private var spokenText = ""
+    @Volatile private var paused = false
+    @Volatile private var spokenOffset = 0
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -32,9 +38,19 @@ class AlarmPlaybackService : Service() {
             return START_NOT_STICKY
         }
 
+        if (intent?.action == ACTION_TOGGLE_PAUSE) {
+            togglePause()
+            return START_NOT_STICKY
+        }
+
         playbackId++
         val requestId = playbackId
-        fromAlarm = intent?.getBooleanExtra(EXTRA_FROM_ALARM, false) == true
+        if (intent?.action != ACTION_NEXT) {
+            fromAlarm = intent?.getBooleanExtra(EXTRA_FROM_ALARM, false) == true
+        }
+        paused = false
+        currentArticle = null
+        currentImage = null
         fetchThread?.interrupt()
         stopSpeechEngine()
         releaseFallbackPlayer()
@@ -63,8 +79,14 @@ class AlarmPlaybackService : Service() {
         fetchThread = Thread {
             try {
                 val article = fetchWithRetry(language, topics, history, randomness)
+                val image = article.imageUrl?.let {
+                    try { WikipediaClient().fetchBitmap(it) } catch (error: Exception) { null }
+                }
                 mainHandler.post {
-                    if (requestId == playbackId) startSpeaking(article, requestId, history)
+                    if (requestId == playbackId) {
+                        currentImage = image
+                        startSpeaking(article, requestId, history)
+                    }
                 }
             } catch (error: IOException) {
                 mainHandler.post {
@@ -105,7 +127,8 @@ class AlarmPlaybackService : Service() {
 
     private fun startSpeaking(article: WikipediaArticle, requestId: Int, history: Set<String>) {
         val preferences = getSharedPreferences(MainActivity.PREFERENCES, MODE_PRIVATE)
-        AlarmNotifications.showAlarm(this, article.title, "Reading today's Wikipedia article", article.url)
+        currentArticle = article
+        postNotification()
 
         val languageCode = preferences.getString(MainActivity.LANGUAGE, "").orEmpty()
             .ifBlank { Locale.getDefault().language }
@@ -132,7 +155,7 @@ class AlarmPlaybackService : Service() {
                 }
                 VoiceSettings.apply(engine, preferences, Locale.forLanguageTag(languageCode).language)
 
-                val spokenText = limitReadingTime(
+                spokenText = limitReadingTime(
                     SpeechText.clean(article.title, article.extract),
                     preferences.getInt(MainActivity.MAX_MINUTES, 0)
                 )
@@ -142,37 +165,70 @@ class AlarmPlaybackService : Service() {
                     .putStringSet(MainActivity.READ_TITLES, (history + article.title).toSet())
                     .apply()
                 speechChunkIndex = 0
+                spokenOffset = 0
                 engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) = Unit
 
                     override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
                         val index = utteranceId?.substringAfterLast('-')?.toIntOrNull() ?: return
                         val offset = speechChunks.getOrNull(index - 1)?.first ?: return
+                        if (!paused) spokenOffset = offset + start
                         ReadingSession.postUpdate(offset + start, offset + end)
                     }
 
                     override fun onDone(utteranceId: String?) {
                         mainHandler.post {
-                            if (requestId == playbackId) speakNextChunk(requestId)
+                            if (requestId == playbackId && !paused) speakNextChunk(requestId)
                         }
                     }
 
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
                         mainHandler.post {
-                            if (requestId == playbackId) fail("Text-to-speech playback failed.")
+                            if (requestId == playbackId && !paused) fail("Text-to-speech playback failed.")
                         }
                     }
 
                     override fun onError(utteranceId: String?, errorCode: Int) {
                         mainHandler.post {
-                            if (requestId == playbackId) fail("Text-to-speech playback failed.")
+                            if (requestId == playbackId && !paused) fail("Text-to-speech playback failed.")
                         }
                     }
                 })
                 speakNextChunk(requestId)
             }
         }
+    }
+
+    private fun postNotification() {
+        val article = currentArticle ?: return
+        AlarmNotifications.showAlarm(
+            this,
+            article.title,
+            if (paused) "Paused" else "Reading today's Wikipedia article",
+            article.url,
+            currentImage,
+            paused,
+            controls = true
+        )
+    }
+
+    // TTS can't pause, so stop and later restart from the word being spoken.
+    private fun togglePause() {
+        val engine = speechEngine ?: return
+        if (currentArticle == null || speechChunks.isEmpty()) return
+        if (!paused) {
+            paused = true
+            engine.stop()
+        } else {
+            paused = false
+            val from = spokenOffset.coerceIn(0, spokenText.length)
+            speechChunks = splitForSpeech(spokenText.substring(from), TextToSpeech.getMaxSpeechInputLength())
+                .map { (offset, chunk) -> (offset + from) to chunk }
+            speechChunkIndex = 0
+            speakNextChunk(playbackId)
+        }
+        postNotification()
     }
 
     private fun speakNextChunk(requestId: Int) {
@@ -299,6 +355,8 @@ null,
 
     companion object {
         const val ACTION_STOP = "com.example.wikiwake.STOP_READING"
+        const val ACTION_TOGGLE_PAUSE = "com.example.wikiwake.TOGGLE_PAUSE"
+        const val ACTION_NEXT = "com.example.wikiwake.NEXT_ARTICLE"
         const val EXTRA_FROM_ALARM = "from_alarm"
         private const val WORDS_PER_MINUTE = 150
         private const val RETRY_DELAY_MS = 5_000L

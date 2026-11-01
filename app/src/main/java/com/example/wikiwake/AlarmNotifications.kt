@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.drawable.Icon
 import android.os.Build
 
 object AlarmNotifications {
@@ -13,7 +15,15 @@ object AlarmNotifications {
     const val NOTIFICATION_ID = 4108
     private const val ERROR_NOTIFICATION_ID = 4109
 
-    fun showAlarm(context: Context, title: String, text: String, url: String? = null) {
+    fun showAlarm(
+        context: Context,
+        title: String,
+        text: String,
+        url: String? = null,
+        image: Bitmap? = null,
+        paused: Boolean = false,
+        controls: Boolean = false
+    ) {
         val manager = context.getSystemService(NotificationManager::class.java)
         ensureChannel(context)
         val notification = Notification.Builder(context, CHANNEL_ID)
@@ -24,26 +34,23 @@ object AlarmNotifications {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setOngoing(true)
             .setContentIntent(alarmActivityIntent(context))
-            .addAction(
-                Notification.Action.Builder(
-                    android.graphics.drawable.Icon.createWithResource(
-                        context,
-                        android.R.drawable.ic_media_pause
-                    ),
-                    "Stop",
-                    PendingIntent.getService(
-                        context,
-                        NOTIFICATION_ID,
-                        Intent(context, AlarmPlaybackService::class.java)
-                            .setAction(AlarmPlaybackService.ACTION_STOP),
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                    )
-                ).build()
+        if (image != null) notification.setLargeIcon(image)
+
+        var actions = 0
+        if (controls) {
+            notification.addAction(
+                if (paused) action(context, R.drawable.ic_action_play, "Resume", AlarmPlaybackService.ACTION_TOGGLE_PAUSE, 2)
+                else action(context, R.drawable.ic_action_pause, "Pause", AlarmPlaybackService.ACTION_TOGGLE_PAUSE, 2)
             )
+            notification.addAction(action(context, R.drawable.ic_action_next, "Next", AlarmPlaybackService.ACTION_NEXT, 3))
+            actions += 2
+        }
+        notification.addAction(action(context, R.drawable.ic_action_stop, "Stop", AlarmPlaybackService.ACTION_STOP, 0))
+        actions++
         if (!url.isNullOrEmpty()) {
             notification.addAction(
                 Notification.Action.Builder(
-                    android.graphics.drawable.Icon.createWithResource(context, android.R.drawable.ic_menu_view),
+                    Icon.createWithResource(context, R.drawable.ic_action_open),
                     "Wikipedia",
                     PendingIntent.getActivity(
                         context,
@@ -54,12 +61,25 @@ object AlarmNotifications {
                 ).build()
             )
         }
+        notification.style = Notification.MediaStyle().setShowActionsInCompactView(*(0 until minOf(actions, 3)).toList().toIntArray())
 
         if (canUseFullScreenIntent(manager)) {
             notification.setFullScreenIntent(alarmActivityIntent(context), true)
         }
         manager.notify(NOTIFICATION_ID, notification.build())
     }
+
+    private fun action(context: Context, icon: Int, label: String, action: String, code: Int) =
+        Notification.Action.Builder(
+            Icon.createWithResource(context, icon),
+            label,
+            PendingIntent.getService(
+                context,
+                NOTIFICATION_ID + code,
+                Intent(context, AlarmPlaybackService::class.java).setAction(action),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        ).build()
 
     fun showError(context: Context, message: String) {
         val manager = context.getSystemService(NotificationManager::class.java)

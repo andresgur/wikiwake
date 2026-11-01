@@ -1,5 +1,7 @@
 package com.example.wikiwake
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import org.json.JSONException
 import org.json.JSONObject
@@ -9,7 +11,7 @@ import java.net.URL
 import java.util.Locale
 import kotlin.random.Random
 
-data class WikipediaArticle(val title: String, val extract: String, val url: String)
+data class WikipediaArticle(val title: String, val extract: String, val url: String, val imageUrl: String? = null)
 
 class WikipediaClient {
     fun fetch(
@@ -46,7 +48,9 @@ class WikipediaClient {
                 .appendQueryParameter("generator", "random")
                 .appendQueryParameter("grnnamespace", "0")
                 .appendQueryParameter("grnlimit", "1")
-                .appendQueryParameter("prop", "extracts|pageprops")
+                .appendQueryParameter("prop", "extracts|pageprops|pageimages")
+                .appendQueryParameter("piprop", "thumbnail")
+                .appendQueryParameter("pithumbsize", "640")
                 .appendQueryParameter("ppprop", "disambiguation")
                 .appendQueryParameter("explaintext", "1")
                 .appendQueryParameter("format", "json")
@@ -64,7 +68,8 @@ class WikipediaClient {
                 return WikipediaArticle(
                     title = title,
                     extract = extract,
-                    url = "https://$language.wikipedia.org/wiki/${Uri.encode(title.replace(' ', '_'))}"
+                    url = "https://$language.wikipedia.org/wiki/${Uri.encode(title.replace(' ', '_'))}",
+                    imageUrl = thumbnailOf(page)
                 )
             }
         }
@@ -127,7 +132,9 @@ class WikipediaClient {
             .appendPath("api.php")
             .appendQueryParameter("action", "query")
             .appendQueryParameter("pageids", pageId)
-            .appendQueryParameter("prop", "extracts|pageprops")
+            .appendQueryParameter("prop", "extracts|pageprops|pageimages")
+            .appendQueryParameter("piprop", "thumbnail")
+            .appendQueryParameter("pithumbsize", "640")
             .appendQueryParameter("ppprop", "disambiguation")
             .appendQueryParameter("explaintext", "1")
             .appendQueryParameter("format", "json")
@@ -145,8 +152,26 @@ class WikipediaClient {
         return WikipediaArticle(
             title = title,
             extract = extract,
-            url = "https://$language.wikipedia.org/wiki/${Uri.encode(title.replace(' ', '_'))}"
+            url = "https://$language.wikipedia.org/wiki/${Uri.encode(title.replace(' ', '_'))}",
+            imageUrl = thumbnailOf(page)
         )
+    }
+
+    private fun thumbnailOf(page: JSONObject): String? =
+        page.optJSONObject("thumbnail")?.optString("source")?.takeIf { it.startsWith("https://") }
+
+    fun fetchBitmap(address: String): Bitmap? {
+        val connection = URL(address).openConnection() as HttpURLConnection
+        connection.connectTimeout = 8_000
+        connection.readTimeout = 10_000
+        connection.setRequestProperty("User-Agent", "WikiWake/1.0 (Android)")
+        return try {
+            if (connection.responseCode in 200..299) BitmapFactory.decodeStream(connection.inputStream) else null
+        } catch (error: IOException) {
+            null
+        } finally {
+            connection.disconnect()
+        }
     }
 
     private fun isDisambiguation(page: JSONObject): Boolean =
