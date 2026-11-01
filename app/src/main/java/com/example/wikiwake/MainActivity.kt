@@ -539,6 +539,21 @@ class MainActivity : Activity() {
             label("No limit is the default. You can stop an article at any time.", 13f, 0xFF5E7370.toInt(), top = 6)
         )
 
+        content.addView(label("OFFLINE MODE", 12f, 0xFF0F766E.toInt(), top = 14))
+        val offlineSwitch = android.widget.Switch(this).apply {
+            text = "Work without internet"
+            isChecked = OfflineMode.enabled(preferences)
+            setTextColor(INK)
+        }
+        content.addView(offlineSwitch, matchWidth(top = 6))
+        val offlineHint = label("", 13f, 0xFF5E7370.toInt(), top = 4)
+        fun describeOffline() {
+            offlineHint.text = "Downloads a few articles in advance (over Wi-Fi) so your alarm works without internet. Uses ~1 MB." +
+                if (offlineSwitch.isChecked) "\nArticles ready: ${OfflineMode.readyCount(this, preferences)} of ${OfflineMode.POOL_SIZE}" else ""
+        }
+        describeOffline()
+        content.addView(offlineHint)
+
         content.addView(label("VOICE", 12f, 0xFF0F766E.toInt(), top = 14))
         var preview: android.speech.tts.TextToSpeech? = null
         var voices: List<android.speech.tts.Voice> = emptyList()
@@ -546,6 +561,8 @@ class MainActivity : Activity() {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, listOf("Default voice"))
         }
         content.addView(voiceSpinner, matchWidth())
+        val voiceWarning = label("", 13f, CORAL, top = 4)
+        content.addView(voiceWarning)
 
         var speedBar: android.widget.SeekBar? = null
         var pitchBar: android.widget.SeekBar? = null
@@ -584,6 +601,14 @@ class MainActivity : Activity() {
         fun voiceLanguage(): String =
             Locale.forLanguageTag(codes[languageSpinner.selectedItemPosition].ifEmpty { Locale.getDefault().language }).language
 
+        fun updateVoiceWarning() {
+            val voice = voices.getOrNull(voiceSpinner.selectedItemPosition - 1)
+            voiceWarning.text = if (offlineSwitch.isChecked && voice?.isNetworkConnectionRequired == true) {
+                "This voice needs internet. Pick an offline voice for offline mode."
+            } else ""
+        }
+        offlineSwitch.setOnCheckedChangeListener { _, _ -> describeOffline(); updateVoiceWarning() }
+
         fun loadVoices() {
             val engine = preview ?: return
             voices = VoiceSettings.voicesFor(engine, voiceLanguage())
@@ -594,6 +619,7 @@ class MainActivity : Activity() {
             )
             val saved = preferences.getString(VoiceSettings.KEY_VOICE, "")
             voiceSpinner.setSelection(voices.indexOfFirst { it.name == saved } + 1)
+            updateVoiceWarning()
         }
         languageSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, position: Int, id: Long) = loadVoices()
@@ -607,6 +633,7 @@ class MainActivity : Activity() {
             override fun onItemSelected(p: android.widget.AdapterView<*>?, v: View?, position: Int, id: Long) {
                 if (userPickedVoice) speakSample()
                 userPickedVoice = false
+                updateVoiceWarning()
             }
             override fun onNothingSelected(p: android.widget.AdapterView<*>?) = Unit
         }
@@ -620,7 +647,10 @@ class MainActivity : Activity() {
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val language = codes[languageSpinner.selectedItemPosition]
+                val fingerprintBefore = OfflineMode.fingerprint(preferences)
+                val offlineBefore = OfflineMode.enabled(preferences)
                 preferences.edit()
+                    .putBoolean(OfflineMode.ENABLED, offlineSwitch.isChecked)
                     .putString(LANGUAGE, language)
                     .putString(TOPICS, topicsInput.text.toString().trim())
                     .putInt(RANDOMNESS, randomnessBar.progress)
@@ -634,6 +664,16 @@ class MainActivity : Activity() {
                     preferences.edit()
                         .putString(VoiceSettings.KEY_VOICE, voices.getOrNull(voiceSpinner.selectedItemPosition - 1)?.name.orEmpty())
                         .apply()
+                }
+                // Only a real change to the offline setup triggers downloads.
+                if (offlineSwitch.isChecked) {
+                    OfflineMode.ensureDaily(this)
+                    if (!offlineBefore || fingerprintBefore != OfflineMode.fingerprint(preferences)) {
+                        OfflineMode.scheduleRefill(this)
+                    }
+                } else if (offlineBefore) {
+                    OfflineMode.cancel(this)
+                    OfflineMode.clear(this)
                 }
                 updateSettingsSummary()
                 dialog.dismiss()

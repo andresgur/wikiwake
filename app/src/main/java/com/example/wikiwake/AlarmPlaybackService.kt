@@ -82,8 +82,18 @@ class AlarmPlaybackService : Service() {
 
         fetchThread = Thread {
             try {
-                val article = fetchWithRetry(language, topics, history, randomness, popularity)
-                val image = article.imageUrl?.let {
+                var cached = false
+                val article = try {
+                    fetchWithRetry(language, topics, history, randomness, popularity)
+                } catch (error: IOException) {
+                    // Offline mode: a stored article beats silence.
+                    val stored = if (OfflineMode.enabled(preferences)) OfflineMode.take(this, preferences) else null
+                    if (stored == null) throw error
+                    cached = true
+                    OfflineMode.scheduleRefill(this)
+                    stored
+                }
+                val image = article.imageUrl?.takeIf { !cached }?.let {
                     try { WikipediaClient().fetchBitmap(it) } catch (error: Exception) { null }
                 }
                 mainHandler.post {
@@ -110,7 +120,8 @@ class AlarmPlaybackService : Service() {
 
     // Alarms retry so a brief network hiccup doesn't skip the article.
     private fun fetchWithRetry(language: String, topics: List<String>, history: Set<String>, randomness: Int, popularity: Int): WikipediaArticle {
-        val attempts = if (fromAlarm) 4 else 1
+        val offline = OfflineMode.enabled(getSharedPreferences(MainActivity.PREFERENCES, MODE_PRIVATE))
+        val attempts = if (fromAlarm && !offline) 4 else 1
         var lastError: IOException? = null
         for (attempt in 1..attempts) {
             try {
