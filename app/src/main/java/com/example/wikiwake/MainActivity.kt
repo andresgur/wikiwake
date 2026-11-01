@@ -394,9 +394,9 @@ class MainActivity : Activity() {
     }
 
     private fun startReading() {
-        val notificationsOn = getSystemService(android.app.NotificationManager::class.java).areNotificationsEnabled()
-        // Without notifications there is no Stop button, so open the reader screen to stop from.
-        if (!notificationsOn) startActivity(Intent(this, AlarmActivity::class.java))
+        // Show the reader straight away; it displays a loading state until the article arrives.
+        ReadingSession.prepare()
+        startActivity(Intent(this, AlarmActivity::class.java))
         val serviceIntent = Intent(this, AlarmPlaybackService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent)

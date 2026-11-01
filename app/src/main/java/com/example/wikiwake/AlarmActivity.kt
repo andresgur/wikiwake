@@ -16,7 +16,11 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.content.res.ColorStateList
+import android.view.Gravity
 import android.widget.Button
+import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -26,7 +30,12 @@ class AlarmActivity : Activity() {
     private lateinit var scroll: ScrollView
     private lateinit var titleView: TextView
     private lateinit var body: TextView
+    private lateinit var imageView: ImageView
+    private lateinit var progress: ProgressBar
+    private lateinit var pauseButton: Button
+    private lateinit var nextButton: Button
     private lateinit var stopButton: Button
+    private lateinit var secondaryRow: LinearLayout
     private lateinit var followButton: Button
     private lateinit var wikiButton: Button
 
@@ -48,13 +57,38 @@ class AlarmActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFFF3F8F6.toInt())
         }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(16), dp(20), dp(8))
+        }
+        imageView = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, dp(12).toFloat())
+                }
+            }
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = View.GONE
+        }
+        header.addView(imageView, LinearLayout.LayoutParams(dp(88), dp(88)).apply { marginEnd = dp(16) })
         titleView = TextView(this).apply {
             textSize = 24f
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             setTextColor(0xFF12312E.toInt())
-            setPadding(dp(20), dp(16), dp(20), dp(8))
         }
-        root.addView(titleView)
+        header.addView(titleView, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(header)
+        progress = ProgressBar(this).apply {
+            isIndeterminate = true
+            indeterminateTintList = ColorStateList.valueOf(0xFF0F766E.toInt())
+        }
+        root.addView(progress, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            gravity = Gravity.CENTER_HORIZONTAL
+            topMargin = dp(24)
+        })
 
         body = TextView(this).apply {
             textSize = 19f
@@ -75,35 +109,47 @@ class AlarmActivity : Activity() {
         root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         val bar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
+            orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(10), dp(12), dp(10))
             setBackgroundColor(0xFFF3F8F6.toInt())
         }
-        stopButton = pill("Stop reading", primary = true) {
-            if (ReadingSession.active) {
-                startService(
-                    Intent(this, AlarmPlaybackService::class.java).setAction(AlarmPlaybackService.ACTION_STOP)
-                )
-            }
+        val params = {
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                .apply { setMargins(dp(4), 0, dp(4), 0) }
+        }
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        pauseButton = pill("Pause", primary = false, icon = R.drawable.ic_action_pause) {
+            sendToService(AlarmPlaybackService.ACTION_TOGGLE_PAUSE)
+        }
+        nextButton = pill("Next", primary = false, icon = R.drawable.ic_action_next) {
+            sendToService(AlarmPlaybackService.ACTION_NEXT)
+        }
+        stopButton = pill("Stop", primary = true, icon = R.drawable.ic_action_stop) {
+            sendToService(AlarmPlaybackService.ACTION_STOP)
             finish()
+        }
+        controls.addView(pauseButton, params())
+        controls.addView(nextButton, params())
+        controls.addView(stopButton, params())
+        bar.addView(controls)
+
+        secondaryRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(8), 0, 0)
         }
         followButton = pill("Follow", primary = false) {
             following = true
             updateButtons()
             scrollToCurrent()
         }
-        wikiButton = pill("Wikipedia", primary = false) {
+        wikiButton = pill("Wikipedia", primary = false, icon = R.drawable.ic_action_open) {
             if (ReadingSession.url.isNotEmpty()) {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ReadingSession.url)))
             }
         }
-        val params = {
-            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                .apply { setMargins(dp(4), 0, dp(4), 0) }
-        }
-        bar.addView(stopButton, params())
-        bar.addView(followButton, params())
-        bar.addView(wikiButton, params())
+        secondaryRow.addView(followButton, params())
+        secondaryRow.addView(wikiButton, params())
+        bar.addView(secondaryRow)
         root.addView(bar)
 
         setContentView(root)
@@ -130,14 +176,19 @@ class AlarmActivity : Activity() {
     private fun refresh() {
         val text = ReadingSession.text
         if (text.isEmpty()) {
+            shownText = null
             titleView.text = "Wiki Wake"
-            body.text = "Finding today's Wikipedia article…"
+            imageView.visibility = View.GONE
+            body.text = if (ReadingSession.loading) "Finding today's Wikipedia article…"
+            else "No article is being read right now."
             updateButtons()
             return
         }
         if (shownText != text) {
             shownText = text
             titleView.text = ReadingSession.title
+            imageView.setImageBitmap(ReadingSession.image)
+            imageView.visibility = if (ReadingSession.image != null) View.VISIBLE else View.GONE
             body.setText(SpannableString(text), TextView.BufferType.SPANNABLE)
             following = true
             scroll.scrollTo(0, 0)
@@ -178,14 +229,28 @@ class AlarmActivity : Activity() {
     }
 
     private fun updateButtons() {
-        stopButton.text = if (ReadingSession.active) "Stop reading" else "Close"
-        followButton.visibility = if (ReadingSession.active && !following) View.VISIBLE else View.GONE
+        val active = ReadingSession.active
+        progress.visibility = if (ReadingSession.loading) View.VISIBLE else View.GONE
+        pauseButton.isEnabled = active
+        nextButton.isEnabled = active || ReadingSession.loading
+        pauseButton.text = if (ReadingSession.paused) "Resume" else "Pause"
+        pauseButton.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (ReadingSession.paused) R.drawable.ic_action_play else R.drawable.ic_action_pause, 0, 0, 0
+        )
+        stopButton.text = if (active || ReadingSession.loading) "Stop" else "Close"
+        followButton.visibility = if (active && !following) View.VISIBLE else View.GONE
         wikiButton.visibility = if (ReadingSession.url.isNotEmpty()) View.VISIBLE else View.GONE
+        secondaryRow.visibility =
+            if (followButton.visibility == View.VISIBLE || wikiButton.visibility == View.VISIBLE) View.VISIBLE else View.GONE
+    }
+
+    private fun sendToService(action: String) {
+        startService(Intent(this, AlarmPlaybackService::class.java).setAction(action))
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private fun pill(label: String, primary: Boolean, action: () -> Unit): Button =
+    private fun pill(label: String, primary: Boolean, icon: Int = 0, action: () -> Unit): Button =
         Button(this).apply {
             text = label
             isAllCaps = false
@@ -204,6 +269,12 @@ class AlarmActivity : Activity() {
                 }
             }
             setTextColor(if (primary) Color.WHITE else accent)
+            if (icon != 0) {
+                setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+                compoundDrawablePadding = dp(6)
+            }
+            compoundDrawableTintList = ColorStateList.valueOf(if (primary) Color.WHITE else accent)
+            setPadding(dp(8), 0, dp(8), 0)
             setOnClickListener { action() }
         }
 }

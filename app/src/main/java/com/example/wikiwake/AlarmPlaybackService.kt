@@ -51,6 +51,7 @@ class AlarmPlaybackService : Service() {
         paused = false
         currentArticle = null
         currentImage = null
+        ReadingSession.prepare()
         fetchThread?.interrupt()
         stopSpeechEngine()
         releaseFallbackPlayer()
@@ -160,7 +161,7 @@ class AlarmPlaybackService : Service() {
                     preferences.getInt(MainActivity.MAX_MINUTES, 0)
                 )
                 speechChunks = splitForSpeech(spokenText, TextToSpeech.getMaxSpeechInputLength())
-                ReadingSession.begin(article.title, article.url, spokenText)
+                ReadingSession.begin(article.title, article.url, spokenText, currentImage)
                 preferences.edit()
                     .putStringSet(MainActivity.READ_TITLES, (history + article.title).toSet())
                     .apply()
@@ -228,6 +229,7 @@ class AlarmPlaybackService : Service() {
             speechChunkIndex = 0
             speakNextChunk(playbackId)
         }
+        ReadingSession.setPaused(paused)
         postNotification()
     }
 
