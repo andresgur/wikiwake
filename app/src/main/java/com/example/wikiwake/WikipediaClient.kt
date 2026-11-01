@@ -14,11 +14,17 @@ import kotlin.random.Random
 data class WikipediaArticle(val title: String, val extract: String, val url: String, val imageUrl: String? = null)
 
 class WikipediaClient {
+    private companion object {
+        const val POPULAR_TRIES = 8
+        const val POPULAR_MIN_MONTHLY_VIEWS = 20_000L
+    }
+
     fun fetch(
         languageOverride: String,
         topics: List<String>,
         previousTitles: Set<String>,
-        randomness: Int = 0
+        randomness: Int = 0,
+        popularity: Int = 0
     ): WikipediaArticle {
         val language = languageOverride.trim().ifEmpty { Locale.getDefault().language }
             .lowercase(Locale.ROOT)
@@ -26,6 +32,27 @@ class WikipediaClient {
             throw IOException("Enter a valid Wikipedia language code, such as en or es.")
         }
 
+        // Popularity is a weighting: this chance decides if this article must be popular.
+        val wantPopular = Random.nextInt(100) < popularity
+        var article = fetchOnce(language, topics, previousTitles, randomness)
+        if (!wantPopular) return article
+        repeat(POPULAR_TRIES - 1) {
+            if (isPopular(language, article.title)) return article
+            article = try {
+                fetchOnce(language, topics, previousTitles, randomness)
+            } catch (error: IOException) {
+                return article
+            }
+        }
+        return article
+    }
+
+    private fun fetchOnce(
+        language: String,
+        topics: List<String>,
+        previousTitles: Set<String>,
+        randomness: Int
+    ): WikipediaArticle {
         if (topics.isEmpty() || Random.nextInt(100) < randomness) {
             return fetchRandom(language, previousTitles)
         }
@@ -34,6 +61,26 @@ class WikipediaClient {
         } catch (error: IOException) {
             // Topic search came up empty or failed: a random article beats silence.
             fetchRandom(language, previousTitles)
+        }
+    }
+
+    // Unknown counts as popular so a failed lookup never blocks the alarm.
+    private fun isPopular(language: String, title: String): Boolean {
+        val format = java.text.SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+            timeZone = java.util.TimeZone.getTimeZone("UTC")
+        }
+        val day = 24L * 60 * 60 * 1000
+        val now = System.currentTimeMillis()
+        val address = "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/" +
+            "$language.wikipedia/all-access/user/${Uri.encode(title.replace(' ', '_'))}/daily/" +
+            "${format.format(now - 31 * day)}/${format.format(now - day)}"
+        return try {
+            val items = getJson(address).optJSONArray("items") ?: return false
+            var total = 0L
+            for (index in 0 until items.length()) total += items.optJSONObject(index)?.optLong("views") ?: 0L
+            total >= POPULAR_MIN_MONTHLY_VIEWS
+        } catch (error: IOException) {
+            true
         }
     }
 

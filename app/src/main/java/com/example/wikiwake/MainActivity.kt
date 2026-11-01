@@ -499,6 +499,28 @@ class MainActivity : Activity() {
         content.addView(randomnessBar, matchWidth(top = 6))
         content.addView(randomnessHint)
 
+        content.addView(label("POPULARITY", 12f, 0xFF0F766E.toInt(), top = 14))
+        val popularityHint = label("", 13f, 0xFF5E7370.toInt(), top = 4)
+        val popularityBar = android.widget.SeekBar(this).apply {
+            max = 100
+            progress = preferences.getInt(POPULARITY, 0)
+        }
+        fun describePopularity(value: Int) {
+            popularityHint.text = when (value) {
+                0 -> "Any article, popular or not"
+                100 -> "Only popular articles"
+                else -> "$value% chance of a popular article, otherwise any"
+            }
+        }
+        describePopularity(popularityBar.progress)
+        popularityBar.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: android.widget.SeekBar?, value: Int, fromUser: Boolean) = describePopularity(value)
+            override fun onStartTrackingTouch(bar: android.widget.SeekBar?) = Unit
+            override fun onStopTrackingTouch(bar: android.widget.SeekBar?) = Unit
+        })
+        content.addView(popularityBar, matchWidth(top = 6))
+        content.addView(popularityHint)
+
         content.addView(label("MAXIMUM READING TIME", 12f, 0xFF0F766E.toInt(), top = 14))
         val lengths = listOf("No limit", "2 minutes", "5 minutes", "10 minutes")
         val lengthValues = listOf(0, 2, 5, 10)
@@ -600,6 +622,7 @@ class MainActivity : Activity() {
                     .putString(LANGUAGE, language)
                     .putString(TOPICS, topicsInput.text.toString().trim())
                     .putInt(RANDOMNESS, randomnessBar.progress)
+                    .putInt(POPULARITY, popularityBar.progress)
                     .putInt(MAX_MINUTES, lengthValues[lengthSpinner.selectedItemPosition])
                     .putInt(VoiceSettings.KEY_RATE, (speedBar?.progress ?: 50) + 50)
                     .putInt(VoiceSettings.KEY_PITCH, (pitchBar?.progress ?: 50) + 50)
@@ -721,6 +744,7 @@ class MainActivity : Activity() {
         const val READ_TITLES = "read_titles"
         const val MAX_MINUTES = "max_reading_minutes"
         const val RANDOMNESS = "randomness"
+        const val POPULARITY = "popularity"
         private const val REQUEST_NOTIFICATIONS = 51
         private val LANGUAGE_CODES = listOf(
             "en", "es", "fr", "de", "it", "pt", "nl", "sv", "no", "da", "fi", "pl", "cs", "hu", "ro",

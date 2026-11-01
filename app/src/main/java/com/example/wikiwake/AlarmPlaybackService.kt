@@ -77,11 +77,12 @@ class AlarmPlaybackService : Service() {
             .map(String::trim)
             .filter(String::isNotEmpty)
         val randomness = preferences.getInt(MainActivity.RANDOMNESS, 0)
+        val popularity = preferences.getInt(MainActivity.POPULARITY, 0)
         val history = preferences.getStringSet(MainActivity.READ_TITLES, emptySet()).orEmpty().toSet()
 
         fetchThread = Thread {
             try {
-                val article = fetchWithRetry(language, topics, history, randomness)
+                val article = fetchWithRetry(language, topics, history, randomness, popularity)
                 val image = article.imageUrl?.let {
                     try { WikipediaClient().fetchBitmap(it) } catch (error: Exception) { null }
                 }
@@ -108,12 +109,12 @@ class AlarmPlaybackService : Service() {
     }
 
     // Alarms retry so a brief network hiccup doesn't skip the article.
-    private fun fetchWithRetry(language: String, topics: List<String>, history: Set<String>, randomness: Int): WikipediaArticle {
+    private fun fetchWithRetry(language: String, topics: List<String>, history: Set<String>, randomness: Int, popularity: Int): WikipediaArticle {
         val attempts = if (fromAlarm) 4 else 1
         var lastError: IOException? = null
         for (attempt in 1..attempts) {
             try {
-                return WikipediaClient().fetch(language, topics, history, randomness)
+                return WikipediaClient().fetch(language, topics, history, randomness, popularity)
             } catch (error: IOException) {
                 lastError = error
                 if (attempt < attempts) {
