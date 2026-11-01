@@ -7,6 +7,8 @@ import android.app.job.JobService
 import android.content.ComponentName
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -58,7 +60,23 @@ object OfflineMode {
         entry.article
     }
 
-    fun clear(context: Context) = synchronized(lock) { File(context.filesDir, FILE_NAME).delete() }
+    fun clear(context: Context) = synchronized(lock) {
+        File(context.filesDir, FILE_NAME).delete()
+        imageDir(context).deleteRecursively()
+    }
+
+    private fun imageDir(context: Context) = File(context.filesDir, "offline_images")
+
+    private fun imageFile(context: Context, language: String, title: String) =
+        File(imageDir(context), "${(language + title).hashCode()}.jpg")
+
+    // Loads the stored thumbnail of an article just taken from the pool, then deletes it.
+    fun takeImage(context: Context, article: WikipediaArticle, language: String): Bitmap? = synchronized(lock) {
+        val file = imageFile(context, language, article.title)
+        val bitmap = if (file.exists()) BitmapFactory.decodeFile(file.path) else null
+        file.delete()
+        bitmap
+    }
 
     fun scheduleRefill(context: Context) = schedule(context, REFILL_JOB, periodic = false)
 
@@ -103,10 +121,17 @@ object OfflineMode {
             val history = preferences.getStringSet(MainActivity.READ_TITLES, emptySet()).orEmpty() + known
             try {
                 val article = client.fetch(language, topics, history, randomness, popularity)
+                val image = article.imageUrl?.let { client.fetchBitmap(it) }
                 synchronized(lock) {
                     val entries = load(context).toMutableList()
                     if (entries.none { it.article.title == article.title && it.language == language }) {
                         entries += Entry(article, language, fingerprint)
+                        if (image != null) {
+                            imageDir(context).mkdirs()
+                            imageFile(context, language, article.title).outputStream().use {
+                                image.compress(Bitmap.CompressFormat.JPEG, 80, it)
+                            }
+                        }
                         save(context, entries)
                     }
                 }
@@ -125,6 +150,8 @@ object OfflineMode {
         val fresh = entries.filter { it.fingerprint == fingerprint }
         val kept = if (fresh.size >= POOL_SIZE) fresh else fresh + (entries - fresh.toSet()).take(POOL_SIZE - fresh.size)
         save(context, kept)
+        val keep = kept.map { imageFile(context, it.language, it.article.title).name }.toSet()
+        imageDir(context).listFiles()?.filter { it.name !in keep }?.forEach { it.delete() }
     }
 
     private fun load(context: Context): List<Entry> {

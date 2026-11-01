@@ -93,7 +93,7 @@ class AlarmPlaybackService : Service() {
                     OfflineMode.scheduleRefill(this)
                     stored
                 }
-                val image = article.imageUrl?.takeIf { !cached }?.let {
+                val image = if (cached) OfflineMode.takeImage(this, article, OfflineMode.language(preferences)) else article.imageUrl?.let {
                     try { WikipediaClient().fetchBitmap(it) } catch (error: Exception) { null }
                 }
                 mainHandler.post {
