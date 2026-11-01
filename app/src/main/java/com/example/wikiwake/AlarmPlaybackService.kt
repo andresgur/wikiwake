@@ -28,6 +28,7 @@ class AlarmPlaybackService : Service() {
     private var fallbackPlayer: MediaPlayer? = null
     private var currentArticle: WikipediaArticle? = null
     private var currentImage: Bitmap? = null
+    private var greet = false
     private var spokenText = ""
     @Volatile private var paused = false
     @Volatile private var spokenOffset = 0
@@ -48,6 +49,7 @@ class AlarmPlaybackService : Service() {
         if (intent?.action != ACTION_NEXT) {
             fromAlarm = intent?.getBooleanExtra(EXTRA_FROM_ALARM, false) == true
         }
+        greet = fromAlarm && intent?.action != ACTION_NEXT
         paused = false
         currentArticle = null
         currentImage = null
@@ -160,7 +162,7 @@ class AlarmPlaybackService : Service() {
                     SpeechText.clean(article.title, article.extract),
                     preferences.getInt(MainActivity.MAX_MINUTES, 0)
                 )
-                spokenText = if (fromAlarm) {
+                spokenText = if (greet) {
                     SpeechText.intro(Locale.forLanguageTag(languageCode).language) + "\n\n" + body
                 } else body
                 speechChunks = splitForSpeech(spokenText, TextToSpeech.getMaxSpeechInputLength())
